@@ -10,3 +10,19 @@ python-decouple==3.8
 psycopg2-binary==2.9.9
 drf-yasg==1.21.7
 django-filter==23.5
+
+# Testing dependencies
+coverage==7.4.0
+pytest==7.4.3
+pytest-django==4.7.0
+pytest-cov==4.1.0
+factory-boy==3.3.0
+
+# Code quality
+flake8==7.0.0
+black==24.1.0
+isort==5.13.2
+
+# Security scanning
+safety==2.3.5
+bandit==1.7.6

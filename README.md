@@ -428,6 +428,61 @@ events/
 └── requirements.txt
 ```
 
+## Testing
+
+This project includes comprehensive End-to-End (E2E) tests to ensure reliability and maintain confidence as changes are made.
+
+### Test Coverage
+
+- ✅ **Authentication Flow**: Registration, login, email verification, profile management
+- ✅ **Event Management**: CRUD operations, filtering, search, favorites, comments
+- ✅ **Ticketing System**: Purchase flow, QR codes, check-in, refunds
+- ✅ **Food Ordering**: Menu browsing, ordering, payment processing
+- ✅ **Review System**: Submission, validation, editing
+- ✅ **Complete User Journeys**: End-to-end flows across multiple features
+
+### Running Tests Locally
+
+```bash
+# Run all tests
+python manage.py test
+
+# Run specific test suite
+python manage.py test users.test_e2e_authentication
+python manage.py test events.test_e2e_events
+python manage.py test tickets.test_e2e_ticketing
+python manage.py test tests.test_e2e_integration
+
+# Run with coverage
+coverage run --source='.' manage.py test
+coverage report
+coverage html  # Generate HTML report in htmlcov/
+
+# Run with verbosity
+python manage.py test --verbosity=2
+```
+
+### Continuous Integration (GitHub Actions)
+
+Tests run automatically on every push and pull request:
+
+- **Python 3.10 & 3.11** compatibility
+- **PostgreSQL** integration testing
+- **Code coverage** reporting
+- **Linting** (flake8, black, isort)
+- **Security scanning** (safety, bandit)
+- **Deployment checks**
+
+View test results in the **Actions** tab on GitHub.
+
+### Test Documentation
+
+For detailed testing information, see [TESTING.md](TESTING.md):
+- Test scenarios and coverage
+- Adding new tests
+- Debugging failed tests
+- CI/CD pipeline details
+
 ## Contributing
 
 1. Fork the repository
