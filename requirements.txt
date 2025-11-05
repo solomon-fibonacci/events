@@ -1,6 +1,7 @@
 Django==5.0
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.3.1
+cryptography>=41.0.0
 django-cors-headers==4.3.1
 Pillow==10.2.0
 stripe==8.0.0
@@ -24,5 +25,5 @@ black==24.1.0
 isort==5.13.2
 
 # Security scanning
-safety==2.3.5
-bandit==1.7.6
+safety==3.2.0
+bandit==1.8.0
