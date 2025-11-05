@@ -48,7 +48,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     """Serializer for changing password"""
     old_password = serializers.CharField(required=True, write_only=True)
-    new_password = serializers.CharField(required=True, write_only=True, validators=[validate_password])
+    new_password = serializers.CharField(required=True, write_only=True)
     new_password2 = serializers.CharField(required=True, write_only=True, label='Confirm New Password')
 
     def validate(self, attrs):

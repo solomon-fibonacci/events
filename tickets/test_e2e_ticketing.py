@@ -10,6 +10,7 @@ from django.utils import timezone
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
 from decimal import Decimal
+from io import BytesIO
 
 from events.models import Event, EventCategory
 from tickets.models import TicketType, Order, Registration, Refund
@@ -86,7 +87,9 @@ class TicketPurchaseE2ETest(TestCase):
         }
 
         # Mock QR code generation
-        mock_qr.return_value = MagicMock()
+        mock_qr_buffer = BytesIO(b'fake-qr-code-data')
+        mock_qr_buffer.name = 'test_qr.png'
+        mock_qr.return_value = mock_qr_buffer
 
         self.client.force_authenticate(user=self.attendee)
 
@@ -175,7 +178,9 @@ class TicketPurchaseE2ETest(TestCase):
 
         # Mock Stripe and QR
         mock_stripe.return_value = {'id': 'pi_test_123', 'client_secret': 'secret'}
-        mock_qr.return_value = MagicMock()
+        mock_qr_buffer = BytesIO(b'fake-qr-code-data')
+        mock_qr_buffer.name = 'test_qr.png'
+        mock_qr.return_value = mock_qr_buffer
 
         # Set ticket to only 1 remaining
         self.general_ticket.quantity = 1

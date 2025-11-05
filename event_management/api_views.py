@@ -36,13 +36,13 @@ from reviews.serializers import ReviewSerializer, ReviewCreateUpdateSerializer
 from event_management.utils.stripe_service import StripeService
 from event_management.utils.qr_service import QRCodeService
 from event_management.utils.email_service import EmailService
-from event_management.permissions import IsEventOrganizer, IsOrganizerOrReadOnly
+from event_management.permissions import IsEventOrganizer, IsOrganizerOrReadOnly, IsOwnerOrReadOnly
 
 
 class EventViewSet(viewsets.ModelViewSet):
     """ViewSet for Event CRUD operations"""
     queryset = Event.objects.all().select_related('organizer', 'category')
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsOrganizerOrReadOnly, IsEventOrganizer]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'privacy', 'category', 'city', 'country']
     search_fields = ['title', 'description', 'venue_name', 'city', 'tags']
@@ -104,7 +104,7 @@ class EventCommentViewSet(viewsets.ModelViewSet):
     """ViewSet for Event Comments"""
     queryset = EventComment.objects.all()
     serializer_class = EventCommentSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['event']
 
