@@ -70,13 +70,24 @@ jobs:
       run: |
         python manage.py check
 
+    - name: Test database connection
+      run: |
+        python manage.py shell -c "from django.db import connection; connection.ensure_connection(); print('Database connection successful')"
+
     - name: Run migrations
       run: |
-        python manage.py migrate --noinput
+        python manage.py migrate --noinput --verbosity=2
 
-    - name: Run E2E Tests with Coverage
+    - name: Run E2E Tests
       run: |
-        coverage run --source='.' manage.py test --verbosity=2
+        python manage.py test --verbosity=2 --keepdb --parallel=1
+      timeout-minutes: 5
+      continue-on-error: false
+
+    - name: Generate coverage report
+      if: success()
+      run: |
+        coverage run --source='.' manage.py test --keepdb
         coverage report
         coverage xml
 

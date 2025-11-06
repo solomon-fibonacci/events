@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config
 import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -76,12 +77,12 @@ WSGI_APPLICATION = "event_management.wsgi.application"
 
 # Database
 # Use PostgreSQL in CI/Production, SQLite for local development
-if config('DATABASE_URL', default=''):
+DATABASE_URL = config('DATABASE_URL', default='')
+if DATABASE_URL:
     # Parse DATABASE_URL for PostgreSQL
-    import dj_database_url
     DATABASES = {
         'default': dj_database_url.config(
-            default=config('DATABASE_URL'),
+            default=DATABASE_URL,
             conn_max_age=600
         )
     }
