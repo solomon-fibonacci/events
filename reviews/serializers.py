@@ -36,3 +36,17 @@ class ReviewCreateUpdateSerializer(serializers.ModelSerializer):
         if value < 1 or value > 5:
             raise serializers.ValidationError("Rating must be between 1 and 5.")
         return value
+
+    def validate(self, attrs):
+        """Validate that user hasn't already reviewed this event"""
+        user = self.context['request'].user
+        event = attrs.get('event')
+
+        # Only check for duplicates when creating (not updating)
+        if not self.instance:
+            if Review.objects.filter(user=user, event=event).exists():
+                raise serializers.ValidationError(
+                    {"event": "You have already reviewed this event."}
+                )
+
+        return attrs
