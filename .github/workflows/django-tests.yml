@@ -31,10 +31,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
@@ -55,6 +55,7 @@ jobs:
         SECRET_KEY=test-secret-key-for-ci
         DEBUG=True
         ALLOWED_HOSTS=localhost,127.0.0.1
+        DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db
         CORS_ALLOW_ALL_ORIGINS=True
         STRIPE_PUBLIC_KEY=pk_test_fake
         STRIPE_SECRET_KEY=sk_test_fake
@@ -65,19 +66,33 @@ jobs:
         FRONTEND_URL=http://localhost:3000
         EOF
 
+    - name: Check Django configuration
+      run: |
+        python manage.py check
+
+    - name: Test database connection
+      run: |
+        python manage.py shell -c "from django.db import connection; connection.ensure_connection(); print('Database connection successful')"
+
     - name: Run migrations
       run: |
-        python manage.py makemigrations
-        python manage.py migrate
+        python manage.py migrate --noinput --verbosity=2
 
-    - name: Run E2E Tests with Coverage
+    - name: Run E2E Tests
       run: |
-        coverage run --source='.' manage.py test --verbosity=2
+        python manage.py test --verbosity=2 --keepdb --parallel=1
+      timeout-minutes: 5
+      continue-on-error: false
+
+    - name: Generate coverage report
+      if: success()
+      run: |
+        coverage run --source='.' manage.py test --keepdb
         coverage report
         coverage xml
 
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
         flags: unittests
@@ -95,10 +110,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -129,10 +144,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -155,7 +170,7 @@ jobs:
         bandit -r . -f json -o bandit-report.json --exclude './venv,./env,*/migrations/*,*/tests/*' || true
 
     - name: Upload security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-reports
         path: |
@@ -166,10 +181,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
