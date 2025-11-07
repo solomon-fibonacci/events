@@ -62,7 +62,7 @@ jobs:
           fetch-depth: 0  # Fetch all history for baseline comparison
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -77,12 +77,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Create environment file
+        run: |
+          cat > .env << EOF
+          SECRET_KEY=test-secret-key-for-ci
+          DEBUG=True
+          ALLOWED_HOSTS=localhost,127.0.0.1
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db
+          CORS_ALLOW_ALL_ORIGINS=True
+          STRIPE_PUBLIC_KEY=pk_test_fake
+          STRIPE_SECRET_KEY=sk_test_fake
+          STRIPE_WEBHOOK_SECRET=whsec_test_fake
+          RESEND_API_KEY=re_test_fake
+          EOF
+
       - name: Set up database
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          DJANGO_SETTINGS_MODULE: event_management.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: 'True'
         run: |
           # Wait for PostgreSQL to be ready
           until pg_isready -h localhost -p 5432 -U postgres; do
@@ -95,18 +104,13 @@ jobs:
 
       - name: Download baseline benchmark (if exists)
         continue-on-error: true
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: baseline-benchmark
           path: performance/benchmarks/
 
       - name: Run quick performance tests
         if: github.event.inputs.test_type == 'quick' || github.event_name == 'pull_request'
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          DJANGO_SETTINGS_MODULE: event_management.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: 'True'
         run: |
           # Create reports directory
           mkdir -p performance/reports
@@ -121,11 +125,6 @@ jobs:
 
       - name: Run full performance tests
         if: github.event.inputs.test_type == 'full' || github.event_name == 'schedule'
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          DJANGO_SETTINGS_MODULE: event_management.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: 'True'
         run: |
           mkdir -p performance/reports
           pytest performance/ \
@@ -136,11 +135,6 @@ jobs:
 
       - name: Run benchmark tests only
         if: github.event.inputs.test_type == 'benchmark'
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          DJANGO_SETTINGS_MODULE: event_management.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: 'True'
         run: |
           mkdir -p performance/reports
           pytest performance/ \
@@ -151,11 +145,6 @@ jobs:
 
       - name: Run concurrency tests
         if: github.event.inputs.test_type == 'concurrency'
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          DJANGO_SETTINGS_MODULE: event_management.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: 'True'
         run: |
           mkdir -p performance/reports
           pytest performance/test_concurrency.py \
@@ -165,11 +154,6 @@ jobs:
       - name: Compare with baseline
         if: github.event_name == 'pull_request'
         continue-on-error: true
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          DJANGO_SETTINGS_MODULE: event_management.settings
-          SECRET_KEY: test-secret-key-for-ci
-          DEBUG: 'True'
         run: |
           if [ -f performance/benchmarks/baseline.json ]; then
             echo "Comparing with baseline..."
@@ -208,7 +192,7 @@ jobs:
 
       - name: Upload performance reports
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: performance-reports-${{ github.run_number }}
           path: |
@@ -217,7 +201,7 @@ jobs:
 
       - name: Upload benchmark results as baseline (if main branch)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: baseline-benchmark
           path: performance/reports/benchmark_*.json
@@ -317,7 +301,7 @@ jobs:
 
       - name: Upload load test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: load-test-reports
           path: performance/reports/load_test_report.html
