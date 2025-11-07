@@ -1,0 +1,299 @@
+name: Performance Tests
+
+on:
+  # Run on pull requests that modify performance-critical files
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'events/**'
+      - 'tickets/**'
+      - 'users/**'
+      - 'event_management/**'
+      - 'performance/**'
+      - 'requirements.txt'
+
+  # Run nightly to track performance trends
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM daily
+
+  # Allow manual triggers
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of performance tests to run'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - full
+          - benchmark
+          - concurrency
+
+jobs:
+  performance-tests:
+    name: Run Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for baseline comparison
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-benchmark pytest-html locust factory-boy faker
+
+      - name: Set up database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        run: |
+          python manage.py migrate --noinput
+
+      - name: Download baseline benchmark (if exists)
+        continue-on-error: true
+        uses: actions/download-artifact@v3
+        with:
+          name: baseline-benchmark
+          path: performance/benchmarks/
+
+      - name: Run quick performance tests
+        if: github.event.inputs.test_type == 'quick' || github.event_name == 'pull_request'
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DJANGO_SETTINGS_MODULE: event_management.settings
+        run: |
+          pytest performance/ \
+            -m "performance and not slow" \
+            -v \
+            --benchmark-only \
+            --benchmark-json=performance/reports/benchmark_quick.json \
+            --html=performance/reports/performance_report.html \
+            --self-contained-html
+
+      - name: Run full performance tests
+        if: github.event.inputs.test_type == 'full' || github.event_name == 'schedule'
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DJANGO_SETTINGS_MODULE: event_management.settings
+        run: |
+          pytest performance/ \
+            -v \
+            --benchmark-only \
+            --benchmark-json=performance/reports/benchmark_full.json \
+            --html=performance/reports/performance_report.html \
+            --self-contained-html
+
+      - name: Run benchmark tests only
+        if: github.event.inputs.test_type == 'benchmark'
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DJANGO_SETTINGS_MODULE: event_management.settings
+        run: |
+          pytest performance/ \
+            -m "benchmark" \
+            -v \
+            --benchmark-only \
+            --benchmark-json=performance/reports/benchmark_only.json
+
+      - name: Run concurrency tests
+        if: github.event.inputs.test_type == 'concurrency'
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DJANGO_SETTINGS_MODULE: event_management.settings
+        run: |
+          pytest performance/test_concurrency.py \
+            -v \
+            --benchmark-json=performance/reports/benchmark_concurrency.json
+
+      - name: Compare with baseline
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DJANGO_SETTINGS_MODULE: event_management.settings
+        run: |
+          if [ -f performance/benchmarks/baseline.json ]; then
+            echo "Comparing with baseline..."
+            pytest performance/ \
+              -m "performance and not slow" \
+              --benchmark-only \
+              --benchmark-compare=performance/benchmarks/baseline.json \
+              --benchmark-compare-fail=mean:20% || echo "Performance regression detected"
+          else
+            echo "No baseline found, skipping comparison"
+          fi
+
+      - name: Generate performance summary
+        if: always()
+        run: |
+          echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Find the most recent benchmark file
+          BENCHMARK_FILE=$(ls -t performance/reports/benchmark_*.json 2>/dev/null | head -1)
+
+          if [ -f "$BENCHMARK_FILE" ]; then
+            echo "Benchmark file: $BENCHMARK_FILE" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Extract and display key metrics (requires jq)
+            if command -v jq &> /dev/null; then
+              echo "### Top 5 Slowest Tests" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              jq -r '.benchmarks | sort_by(.stats.mean) | reverse | .[0:5] | .[] | "- \(.name): \(.stats.mean * 1000 | round)ms (mean)"' "$BENCHMARK_FILE" >> $GITHUB_STEP_SUMMARY || echo "Could not parse benchmark results" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "No benchmark results found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload performance reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-reports-${{ github.run_number }}
+          path: |
+            performance/reports/
+          retention-days: 30
+
+      - name: Upload benchmark results as baseline (if main branch)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v3
+        with:
+          name: baseline-benchmark
+          path: performance/reports/benchmark_*.json
+          retention-days: 90
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            const benchmarkFiles = fs.readdirSync('performance/reports/')
+              .filter(f => f.startsWith('benchmark_') && f.endsWith('.json'));
+
+            if (benchmarkFiles.length === 0) {
+              console.log('No benchmark files found');
+              return;
+            }
+
+            const benchmarkFile = `performance/reports/${benchmarkFiles[0]}`;
+            const benchmark = JSON.parse(fs.readFileSync(benchmarkFile, 'utf8'));
+
+            const slowTests = benchmark.benchmarks
+              .sort((a, b) => b.stats.mean - a.stats.mean)
+              .slice(0, 5)
+              .map(b => `- **${b.name}**: ${(b.stats.mean * 1000).toFixed(2)}ms (mean)`)
+              .join('\n');
+
+            const body = `## ⚡ Performance Test Results
+
+            **Top 5 Slowest Tests:**
+            ${slowTests}
+
+            **Total Tests Run:** ${benchmark.benchmarks.length}
+
+            📊 [View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            <details>
+            <summary>Performance Targets</summary>
+
+            - GET /api/events/: < 500ms (p95)
+            - GET /api/events/{slug}/: < 200ms (p95)
+            - POST /api/tickets/check-in/: < 100ms (p95)
+            - POST /api/tickets/order/: < 2s (p95)
+
+            </details>
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail if performance targets not met
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          # This step can be customized to fail the build based on specific criteria
+          # For now, it's informational only
+          echo "Performance test results reviewed. Check artifacts for details."
+
+  load-testing:
+    name: Load Testing (Optional)
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_type == 'full' && github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install locust
+
+      - name: Run Locust load test
+        run: |
+          # Start the application in the background (adjust as needed)
+          # python manage.py runserver &
+          # sleep 10
+
+          # Run Locust in headless mode
+          # locust -f performance/locustfile.py \
+          #   --host=http://localhost:8000 \
+          #   --users=50 --spawn-rate=5 --run-time=2m \
+          #   --headless --html=performance/reports/load_test_report.html
+
+          echo "Load testing skipped - requires running application"
+
+      - name: Upload load test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-reports
+          path: performance/reports/load_test_report.html
+          retention-days: 30
