@@ -120,9 +120,18 @@ class OrderFactory(DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     event = factory.SubFactory(EventFactory)
     status = 'completed'
-    subtotal = factory.Faker('pydecimal', left_digits=3, right_digits=2, positive=True, min_value=50, max_value=1000)
-    tax = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker('pydecimal', left_digits=0, right_digits=2, positive=True, min_value=0.05, max_value=0.10).generate({}))
-    service_fee = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker('pydecimal', left_digits=0, right_digits=2, positive=True, min_value=0.02, max_value=0.05).generate({}))
+    subtotal = factory.Faker(
+        'pydecimal', left_digits=3, right_digits=2,
+        positive=True, min_value=50, max_value=1000
+    )
+    tax = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker(
+        'pydecimal', left_digits=0, right_digits=2,
+        positive=True, min_value=0.05, max_value=0.10
+    ).generate({}))
+    service_fee = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker(
+        'pydecimal', left_digits=0, right_digits=2,
+        positive=True, min_value=0.02, max_value=0.05
+    ).generate({}))
     total = factory.LazyAttribute(lambda obj: obj.subtotal + obj.tax + obj.service_fee)
     stripe_payment_intent_id = factory.Sequence(lambda n: f'pi_test_{n}')
     paid_at = factory.LazyFunction(timezone.now)
@@ -217,9 +226,18 @@ class FoodOrderFactory(DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     event = factory.SubFactory(EventFactory)
     status = 'confirmed'
-    subtotal = factory.Faker('pydecimal', left_digits=2, right_digits=2, positive=True, min_value=20, max_value=200)
-    tax = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker('pydecimal', left_digits=0, right_digits=2, positive=True, min_value=0.05, max_value=0.10).generate({}))
-    service_fee = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker('pydecimal', left_digits=0, right_digits=2, positive=True, min_value=0.02, max_value=0.05).generate({}))
+    subtotal = factory.Faker(
+        'pydecimal', left_digits=2, right_digits=2,
+        positive=True, min_value=20, max_value=200
+    )
+    tax = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker(
+        'pydecimal', left_digits=0, right_digits=2,
+        positive=True, min_value=0.05, max_value=0.10
+    ).generate({}))
+    service_fee = factory.LazyAttribute(lambda obj: obj.subtotal * factory.Faker(
+        'pydecimal', left_digits=0, right_digits=2,
+        positive=True, min_value=0.02, max_value=0.05
+    ).generate({}))
     total = factory.LazyAttribute(lambda obj: obj.subtotal + obj.tax + obj.service_fee)
     stripe_payment_intent_id = factory.Sequence(lambda n: f'pi_food_test_{n}')
     paid_at = factory.LazyFunction(timezone.now)

@@ -290,7 +290,7 @@ class TestCommentQueries:
                 .select_related('user')[:50]
             )
 
-        result = benchmark(query_events)
+        result = benchmark(query_comments)
         assert len(result) <= 50
 
     @pytest.mark.benchmark
