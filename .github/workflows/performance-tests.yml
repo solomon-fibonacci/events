@@ -76,7 +76,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-benchmark pytest-html locust factory-boy faker
 
       - name: Set up database
         env:
@@ -98,9 +97,8 @@ jobs:
           DJANGO_SETTINGS_MODULE: event_management.settings
         run: |
           pytest performance/ \
-            -m "performance and not slow" \
+            -m "not slow" \
             -v \
-            --benchmark-only \
             --benchmark-json=performance/reports/benchmark_quick.json \
             --html=performance/reports/performance_report.html \
             --self-contained-html
@@ -113,7 +111,6 @@ jobs:
         run: |
           pytest performance/ \
             -v \
-            --benchmark-only \
             --benchmark-json=performance/reports/benchmark_full.json \
             --html=performance/reports/performance_report.html \
             --self-contained-html
@@ -150,7 +147,7 @@ jobs:
           if [ -f performance/benchmarks/baseline.json ]; then
             echo "Comparing with baseline..."
             pytest performance/ \
-              -m "performance and not slow" \
+              -m "benchmark and not slow" \
               --benchmark-only \
               --benchmark-compare=performance/benchmarks/baseline.json \
               --benchmark-compare-fail=mean:20% || echo "Performance regression detected"
