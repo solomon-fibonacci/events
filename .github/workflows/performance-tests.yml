@@ -80,7 +80,17 @@ jobs:
       - name: Set up database
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          DJANGO_SETTINGS_MODULE: event_management.settings
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: 'True'
         run: |
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+          # Run migrations
           python manage.py migrate --noinput
 
       - name: Download baseline benchmark (if exists)
@@ -95,7 +105,13 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           DJANGO_SETTINGS_MODULE: event_management.settings
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: 'True'
         run: |
+          # Create reports directory
+          mkdir -p performance/reports
+
+          # Run tests
           pytest performance/ \
             -m "not slow" \
             -v \
@@ -108,7 +124,10 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           DJANGO_SETTINGS_MODULE: event_management.settings
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: 'True'
         run: |
+          mkdir -p performance/reports
           pytest performance/ \
             -v \
             --benchmark-json=performance/reports/benchmark_full.json \
@@ -120,7 +139,10 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           DJANGO_SETTINGS_MODULE: event_management.settings
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: 'True'
         run: |
+          mkdir -p performance/reports
           pytest performance/ \
             -m "benchmark" \
             -v \
@@ -132,7 +154,10 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           DJANGO_SETTINGS_MODULE: event_management.settings
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: 'True'
         run: |
+          mkdir -p performance/reports
           pytest performance/test_concurrency.py \
             -v \
             --benchmark-json=performance/reports/benchmark_concurrency.json
@@ -143,9 +168,12 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           DJANGO_SETTINGS_MODULE: event_management.settings
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: 'True'
         run: |
           if [ -f performance/benchmarks/baseline.json ]; then
             echo "Comparing with baseline..."
+            mkdir -p performance/reports
             pytest performance/ \
               -m "benchmark and not slow" \
               --benchmark-only \
